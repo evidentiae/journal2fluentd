@@ -14,5 +14,5 @@ mkDerivation {
     pipes-aeson pipes-bytestring pipes-network pipes-safe text time
     unix unordered-containers
   ];
-  license = stdenv.lib.licenses.unfree;
+  license = stdenv.lib.licenses.free;
 }
