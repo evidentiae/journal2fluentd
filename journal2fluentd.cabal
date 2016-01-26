@@ -1,0 +1,25 @@
+name:                journal2fluentd
+version:             0.1.0
+author:              Rickard Nilsson
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable journal2fluentd
+  main-is:             Main.hs
+  ghc-options:         -Wall -threaded -O3
+  build-depends:       base,
+                       bytestring,
+                       text,
+                       unordered-containers,
+                       unix,
+                       aeson,
+                       pipes,
+                       pipes-aeson,
+                       pipes-safe,
+                       pipes-bytestring,
+                       pipes-network,
+                       iso8601-time,
+                       time,
+                       network,
+                       libsystemd-journal
+  default-language:    Haskell2010
