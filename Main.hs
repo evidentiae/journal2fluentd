@@ -30,10 +30,13 @@ import qualified Data.Text as T
 import qualified Pipes.Prelude as P
 import qualified System.Posix.Files
 
+data SType = TCP | UDP deriving (Eq, Generic, A.FromJSON)
+
 data Config = Config
   { cursorFile :: FilePath
   , fluentdHost :: String
   , fluentdPort :: Int
+  , socketType :: Maybe SType
   } deriving (Generic, A.FromJSON)
 
 loadConfig :: IO Config
@@ -55,10 +58,11 @@ main = do
   runSafeT $ runEffect $ src start >-> P.chain (checkpoint cursorFile) >-> encode >-> o
 
 out :: Config -> IO (Consumer BS.ByteString (SafeT IO) ())
-out (Config {fluentdHost, fluentdPort}) = do
+out (Config {fluentdHost, fluentdPort, socketType}) = do
   addrInfo <- getAddrInfo Nothing (Just fluentdHost) (Just (show fluentdPort))
   let serverAddr = head addrInfo
-  sock <- socket (addrFamily serverAddr) Stream defaultProtocol
+      stype = if socketType == (Just UDP) then Datagram else Stream
+  sock <- socket (addrFamily serverAddr) stype defaultProtocol
   connect sock (addrAddress serverAddr)
   return $ toSocket sock
 
