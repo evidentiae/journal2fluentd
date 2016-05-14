@@ -37,6 +37,7 @@ data Config = Config
   , fluentdHost :: String
   , fluentdPort :: Int
   , socketType :: Maybe SType
+  , beginFromStart :: Maybe Bool
   } deriving (Generic, A.FromJSON)
 
 loadConfig :: IO Config
@@ -49,12 +50,14 @@ loadConfig = do
 
 main :: IO ()
 main = do
-  cfg@Config {cursorFile} <- loadConfig
+  cfg@Config {cursorFile, beginFromStart} <- loadConfig
   o <- out cfg
   hasCursor <- System.Posix.Files.fileExist cursorFile
   start <- if hasCursor
            then fmap (flip FromCursor Forwards) (BS.readFile cursorFile)
-           else return (FromStart) -- Forwards)
+           else case beginFromStart of
+                  Just True -> return FromStart
+                  _ -> return (FromEnd Forwards)
   runSafeT $ runEffect $ src start >-> P.chain (checkpoint cursorFile) >-> encode >-> o
 
 out :: Config -> IO (Consumer BS.ByteString (SafeT IO) ())
