@@ -10,6 +10,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
 import Data.List ( find )
+import Data.Maybe
 import Data.Ratio ( (%) )
 import Data.Text.Encoding
 import Data.Time.Clock.POSIX
@@ -77,8 +78,11 @@ encode = for (P.map tojson) $ \e ->
            for (encodeObject e) $ \bs -> yield bs >> yield "\n"
 
 tojson :: JournalEntry -> HM.HashMap T.Text A.Value
-tojson je = HM.fromList $ timestamp : cursor : map fieldMap kvs
+tojson je = HM.fromList $ timestamp : cursor : ident : map fieldMap kvs
   where
+    lookupTag :: T.Text -> Maybe T.Text
+    lookupTag t = snd <$> find ((== t) . fst) kvs
+    stripSuffix' s t = fromMaybe t (T.stripSuffix s t)
     safeUtf8 (decodeUtf8' -> Right t) = t
     safeUtf8 _ = "[DATA]"
     kvs = [(journalField k, safeUtf8 v) | (k,v) <- HM.toList (journalEntryFields je)]
@@ -86,14 +90,17 @@ tojson je = HM.fromList $ timestamp : cursor : map fieldMap kvs
     timestamp = ("@timestamp"
                 , A.String $ T.pack $ formatISO8601 $
                   posixSecondsToUTCTime $ fromRational $ us % 1000000)
-    us = case find ((== "_SOURCE_REALTIME_TIMESTAMP") . fst) kvs of
-           Just (_,v) -> read (T.unpack v)
+    identText = stripSuffix' ".service" $ head $ catMaybes $
+                  map lookupTag ["UNIT","_SYSTEMD_UNIT","SYSLOG_IDENTIFIER"] ++
+                  [Just "unknown"]
+    ident = ("ident", A.String identText)
+    us = case lookupTag "_SOURCE_REALTIME_TIMESTAMP" of
+           Just v -> read (T.unpack v)
            Nothing -> toInteger $ journalEntryRealtime je
 
 fieldMap :: (T.Text, T.Text) -> (T.Text, A.Value)
 fieldMap ("MESSAGE", v) = ("message", A.String v)
 fieldMap ("_HOSTNAME", v) = ("host", A.String $ T.takeWhile ((/=) '.') v)
-fieldMap ("SYSLOG_IDENTIFIER", v) = ("ident", A.String v)
 fieldMap (k, v) = (T.toLower . T.dropWhile ((==) '_') $ k, A.String v)
 
 checkpoint :: String -> JournalEntry -> (SafeT IO) ()
