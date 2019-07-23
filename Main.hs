@@ -74,8 +74,9 @@ src :: Start -> Producer JournalEntry (SafeT IO) ()
 src start = openJournal [] start Nothing Nothing
 
 encode :: Pipe JournalEntry BS.ByteString (SafeT IO) ()
-encode = for (P.map tojson) $ \e ->
-           for (encodeObject e) $ \bs -> yield bs >> yield "\n"
+encode = for (P.map tojson) $ \e -> do
+  for (encodeObject e) yield
+  yield "\n"
 
 tojson :: JournalEntry -> HM.HashMap T.Text A.Value
 tojson je = HM.fromList $ timestamp : cursor : ident : map fieldMap kvs
